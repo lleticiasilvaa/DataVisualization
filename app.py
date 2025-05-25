@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title='👩‍💻💸', layout='wide') #💰🤑
+st.set_page_config(page_title='', layout='wide') #💰🤑👩‍💻💸
 
 # Define the pages
 main_page = st.Page("main_page.py", title="Análise", icon="📊")
