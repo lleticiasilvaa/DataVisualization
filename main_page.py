@@ -114,139 +114,130 @@ st.sidebar.header("⚙️ APIs")
 api_nomes = [api["name"] for api in st.session_state.apis]
 apis_escolhidas = st.sidebar.multiselect("Escolha as APIs", api_nomes)
 
-# st.sidebar.markdown("# Parametros")
-
-# st.sidebar.header("🖥️ GPU - Configuração")
-# instance_name = st.sidebar.text_input("Nome da Instânica", value='Oracle-NVIDIA A10')
-# gpu_hour_price = st.sidebar.number_input("Preço por Hora da GPU (R$)", value=11.10, min_value=0.0)
-# gpu_memory_total = st.sidebar.number_input("Memória Total da GPU (GB)", value=24.0, min_value=0.1)
-
-# st.sidebar.header("⚙️ API")
-# st.sidebar.subheader("Preço por Milhão de Tokens")
-
-# model_name = st.sidebar.text_input("Nome do Modelo", value='gpt-4o-mini')
-# price_input = st.sidebar.number_input("Tokens de Entrada (R$)", value=0.60, min_value=0.0)
-# price_output = st.sidebar.number_input("Tokens de Saída (R$)", value=2.50, min_value=0.0)
-
-# st.sidebar.header("🧠 Estratégia")
-# model_memory = st.sidebar.number_input("Memória Ocupada pelo Modelo (GB)", value=12.0, min_value=0.1)
-# request_time = st.sidebar.number_input("Tempo por Requisição (seg)", value=1.0, min_value=0.1)
-# input_tokens = st.sidebar.number_input("Tokens de Entrada por Requisição", value=800)
-# output_tokens = st.sidebar.number_input("Tokens de Saída por Requisição", value=1200)
-
-
-# if model_memory > gpu_memory_total:
-#     st.error("Erro: o modelo ocupa mais memória do que a disponível na GPU.")
-# else:
-#     concurrent_models = int(gpu_memory_total // model_memory)
-#     max_reqs_per_model = int(3600 // request_time)
-#     max_reqs_total = concurrent_models * max_reqs_per_model
-
-#     st.markdown(f"""
-#     - **Modelos simultâneos na GPU:** {concurrent_models}  
-#     - **Máx. requisições por modelo/hora:** {max_reqs_per_model}  
-#     - **Máx. requisições totais por hora:** {max_reqs_total}
-#     """)
-
-#     x = list(range(1, max_reqs_total + 1))
-#     y_gpu = [gpu_hour_price / r for r in x]
-#     y_api = [tokens_to_price(input_tokens, output_tokens, price_input, price_output)] * len(x)
-
-#     df_plot = pd.DataFrame({
-#         "Requisições por hora": x + x,
-#         "Custo (R$/req)": y_gpu + y_api,
-#         "Origem": [instance_name] * len(x) + [model_name] * len(x)
-#     })
-
-#     fig = px.line(df_plot, x="Requisições por hora", y="Custo (R$/req)", color="Origem",
-#                   log_x=True, log_y=True,
-#                   title="Custo por Requisição: GPU remota vs API")
-
-#     diff = np.array(y_gpu) - np.array(y_api)
-#     cross_indices = np.where(np.diff(np.sign(diff)))[0]
-
-#     if len(cross_indices) > 0:
-#         idx = cross_indices[0]
-#         x_cross = x[idx]
-#         y_cross = y_gpu[idx]
-#         fig.add_scatter(x=[x_cross], y=[y_cross], mode='markers+text',
-#                         marker=dict(color='black', size=10),
-#                         text=[f"{x_cross} req/h"], textposition="top center",
-#                         name="Ponto de cruzamento")
-
-#     st.plotly_chart(fig, use_container_width=True)
 
 if estrategia and gpu and apis_escolhidas:
-
+    
     if estrategia["memory"] > gpu["memory"]:
         st.error("Erro: o modelo ocupa mais memória do que a disponível na GPU.")
     else:
-        concurrent_models = int(gpu["memory"] // estrategia["memory"])
-        max_reqs_per_model = int(3600 // estrategia["time"])
-        max_reqs_total = concurrent_models * max_reqs_per_model
-
-        x = list(range(1, max_reqs_total + 1))
-        y_gpu = [gpu["hour_price"] / r for r in x]
-
-        df_plot = pd.DataFrame({
-            "Requisições por hora": x,
-            "Custo (R$/req)": y_gpu,
-            "Origem": [gpu["name"]] * len(x)
-        })
+    
+        col1, col2 = st.columns(2)
         
-        fig = None  # Vamos declarar o fig fora para usar depois
-        cross_points = []
+        with col1:
 
-        for nome_api in apis_escolhidas:
-            api = next(a for a in st.session_state.apis if a["name"] == nome_api)
-            custo_api = tokens_to_price(estrategia["input_tokens"],
-                                        estrategia["output_tokens"],
-                                        api["input_tokens"],
-                                        api["output_tokens"])
-            
-            y_api = [custo_api] * len(x)
-            df_api = pd.DataFrame({
+            concurrent_models = int(gpu["memory"] // estrategia["memory"])
+            max_reqs_per_model = int(3600 // estrategia["time"])
+            max_reqs_total = concurrent_models * max_reqs_per_model
+
+            x = list(range(1, max_reqs_total + 1))
+            y_gpu = [gpu["hour_price"] / r for r in x]
+
+            df_plot = pd.DataFrame({
                 "Requisições por hora": x,
-                "Custo (R$/req)": y_api,
-                "Origem": [api["name"]] * len(x)
+                "Custo (R$/req)": y_gpu,
+                "Origem": [gpu["name"]] * len(x)
             })
             
-            df_plot = pd.concat([df_plot, df_api], ignore_index=True)
-    
-            # Calcula ponto de cruzamento entre GPU e esta API
-            diff = np.array(y_gpu) - np.array(y_api)
-            cross_indices = np.where(np.diff(np.sign(diff)))[0]
+            fig = None  # Vamos declarar o fig fora para usar depois
+            cross_points = []
 
-            if len(cross_indices) > 0:
-                idx = cross_indices[0]
-                x_cross = x[idx]
-                y_cross = y_gpu[idx]
-                cross_points.append((x_cross, y_cross, api["name"]))
-
-        fig = px.line(df_plot, x="Requisições por hora", y="Custo (R$/req)", color="Origem",
-                      log_x=True, log_y=True,
-                      title="Custo por Requisição: GPU remota vs APIs")
+            for nome_api in apis_escolhidas:
+                api = next(a for a in st.session_state.apis if a["name"] == nome_api)
+                custo_api = tokens_to_price(estrategia["input_tokens"],
+                                            estrategia["output_tokens"],
+                                            api["input_tokens"],
+                                            api["output_tokens"])
+                
+                y_api = [custo_api] * len(x)
+                df_api = pd.DataFrame({
+                    "Requisições por hora": x,
+                    "Custo (R$/req)": y_api,
+                    "Origem": [api["name"]] * len(x)
+                })
+                
+                df_plot = pd.concat([df_plot, df_api], ignore_index=True)
         
-        for i, (x_cross, y_cross, nome_api) in enumerate(cross_points):
-            fig.add_scatter(
-                x=[x_cross], y=[y_cross],
-                mode='markers+text', #'markers',
-                marker=dict(color='green', size=10), #symbol='x'
-                #hovertext=[f"{x_cross} req/h — {nome_api}"],
-                text=[f"{x_cross} req/h"],
-                textposition="top right",
-                name="Ponto de cruzamento" if i == 0 else None,
-                showlegend=(i == 0)
+                # Calcula ponto de cruzamento entre GPU e esta API
+                diff = np.array(y_gpu) - np.array(y_api)
+                cross_indices = np.where(np.diff(np.sign(diff)))[0]
+
+                if len(cross_indices) > 0:
+                    idx = cross_indices[0]
+                    x_cross = x[idx]
+                    y_cross = y_gpu[idx]
+                    cross_points.append((x_cross, y_cross, api["name"]))
+
+            fig = px.line(df_plot, x="Requisições por hora", y="Custo (R$/req)", color="Origem",
+                        log_x=True, log_y=True,
+                        title="Custo por Requisição: GPU remota vs APIs")
+            
+            for i, (x_cross, y_cross, nome_api) in enumerate(cross_points):
+                fig.add_scatter(
+                    x=[x_cross], y=[y_cross],
+                    mode='markers+text', #'markers',
+                    marker=dict(color='green', size=10), #symbol='x'
+                    #hovertext=[f"{x_cross} req/h — {nome_api}"],
+                    text=[f"{x_cross} req/h"],
+                    textposition="top right",
+                    name="Ponto de cruzamento" if i == 0 else None,
+                    showlegend=False #(i == 0)
+                )
+            
+            #fig.update_layout(showlegend=False) 
+            fig.update_layout(
+                legend=dict(
+                    orientation="h",           # horizontal
+                    yanchor="bottom",          # âncora inferior
+                    y=-0.5,                    # um pouco abaixo do gráfico
+                    xanchor="center",          # centralizado horizontalmente
+                    x=0.5                      # centro da largura
+                )
             )
 
-        st.plotly_chart(fig, use_container_width=True)
-    
-        st.markdown(f"""
-        - **Modelos simultâneos na GPU:** {concurrent_models}  
-        - **Máx. requisições por modelo/hora:** {max_reqs_per_model}  
-        - **Máx. requisições totais por hora:** {max_reqs_total}
-        """)
-    
+            st.plotly_chart(fig, use_container_width=True)
+        
+            st.markdown(f"""
+            - **Modelos simultâneos na GPU:** {concurrent_models}  
+            - **Máx. requisições por modelo/hora:** {max_reqs_per_model}  
+            - **Máx. requisições totais por hora:** {max_reqs_total}
+            """)
+            
+        with col2:
+            # Exemplo de dados (substitua pelos reais do seu contexto)
+            dados_barras = [
+                {"Origem": estrategia["name"], "Conjunto": "Spider-Dev", "ex_all": estrategia["ex_all_spider-dev"]*100},
+                {"Origem": estrategia["name"], "Conjunto": "CNPJ", "ex_all": estrategia["ex_all_cnpj"]*100}
+            ]
+            
+            for nome_api in apis_escolhidas:
+                api = next(a for a in st.session_state.apis if a["name"] == nome_api)
+                dados_barras.append({"Origem": api["name"], "Conjunto": "Spider-Dev", "ex_all": api["ex_all_spider-dev"]*100})
+                dados_barras.append({"Origem": api["name"], "Conjunto": "CNPJ", "ex_all": api["ex_all_cnpj"]*100})
+
+            df_barras = pd.DataFrame(dados_barras)
+
+            fig_barras = px.bar(
+                df_barras,
+                x="Conjunto",
+                y="ex_all",
+                color="Origem",
+                barmode="group",
+                title="Comparação de Desempenho",
+            )
+            # fig_barras.update_layout(showlegend=False)  # Oculta a legend
+            
+            fig_barras.update_layout(
+                legend=dict(
+                    orientation="h",           # horizontal
+                    yanchor="bottom",          # âncora inferior
+                    y=-0.5,                    # um pouco abaixo do gráfico
+                    xanchor="center",          # centralizado horizontalmente
+                    x=0.5                      # centro da largura
+                )
+            )
+            
+            st.plotly_chart(fig_barras, use_container_width=True)            
+        
         st.divider()
         
         col1, col2, col3, col4, col5 = st.columns([3, 1.5, 1.5, 1.5, 1.5])
@@ -286,85 +277,7 @@ if estrategia and gpu and apis_escolhidas:
         
         col5.markdown("<p style='text-align: right'>Preço/1M de tokens</p>", unsafe_allow_html=True)
         
-        # linhas = st.number_input("Número de linhas do grid de gráficos", min_value=1, value=4)
-        # colunas = st.number_input("Número de colunas do grid de gráficos", min_value=1, value=6)
         
-        # # Estratégias disponíveis
-        # estrategias = st.session_state.estrategias  # Lista de dicionários
-
-        # # Subplots com tamanho ajustável
-        # fig = make_subplots(rows=linhas, cols=colunas,
-        #                     subplot_titles=[e["name"] for e in estrategias],
-        #                     shared_xaxes=True, shared_yaxes=True)
-
-        # total = len(estrategias)
-        # for idx, estrategia in enumerate(estrategias):
-        #     row = idx // colunas + 1
-        #     col = idx % colunas + 1
-
-        #     if estrategia["memory"] > gpu["memory"]:
-        #         st.warning(f"A estratégia '{estrategia['name']}' excede a memória da GPU.")
-        #         continue
-
-        #     concurrent_models = int(gpu["memory"] // estrategia["memory"])
-        #     max_reqs_per_model = int(3600 // estrategia["time"])
-        #     max_reqs_total = concurrent_models * max_reqs_per_model
-
-        #     x = list(range(1, max_reqs_total + 1))
-        #     y_gpu = [gpu["hour_price"] / r for r in x]
-
-        #     fig.add_trace(
-        #         go.Scatter(x=x, y=y_gpu, mode='lines', name=gpu["name"], legendgroup=gpu["name"],
-        #                 line=dict(color='blue')),
-        #         row=row, col=col
-        #     )
-
-        #     for i, nome_api in enumerate(apis_escolhidas):
-        #         api = next(a for a in st.session_state.apis if a["name"] == nome_api)
-        #         custo_api = tokens_to_price(estrategia["input_tokens"],
-        #                                     estrategia["output_tokens"],
-        #                                     api["input_tokens"],
-        #                                     api["output_tokens"])
-        #         y_api = [custo_api] * len(x)
-
-        #         fig.add_trace(
-        #             go.Scatter(x=x, y=y_api, mode='lines', name=api["name"], legendgroup=api["name"],
-        #                     line=dict(dash='dot')),
-        #             row=row, col=col
-        #         )
-
-        #         # Cruzamento
-        #         diff = np.array(y_gpu) - np.array(y_api)
-        #         cross_idx = np.where(np.diff(np.sign(diff)))[0]
-        #         if len(cross_idx) > 0:
-        #             idx_cross = cross_idx[0]
-        #             fig.add_trace(
-        #                 go.Scatter(
-        #                     x=[x[idx_cross]], y=[y_gpu[idx_cross]],
-        #                     mode='markers+text',
-        #                     marker=dict(color='green', size=10),
-        #                     text=[f"{x[idx_cross]} req/h"],
-        #                     textposition="top right",
-        #                     name="Cruzamento" if i == 0 else None,
-        #                     showlegend=(row == 1 and col == 1 and i == 0)
-        #                 ),
-        #                 row=row, col=col
-        #             )
-
-        # # Layout global
-        # fig.update_layout(
-        #     height=400 * linhas,
-        #     width=500 * colunas,
-        #     title_text="Custo por Requisição: GPU vs APIs por Estratégia",
-        #     showlegend=False
-        # )
-
-        # # Eixos log em todos os subgráficos
-        # fig.update_xaxes(type="log", title_text="Requisições por hora")
-        # fig.update_yaxes(type="log", title_text="Custo (R$/req)")
-
-        # # Exibir na página
-        # st.plotly_chart(fig, use_container_width=True)
 
 
         
