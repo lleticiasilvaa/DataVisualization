@@ -1,29 +1,10 @@
 import streamlit as st
+import re
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.express as px
-import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# # Inicializa a flag do popup se ainda não existir
-# if "show_popup" not in st.session_state:
-#     st.session_state.show_popup = False
-
-# # Botão para abrir o gráfico
-# if st.button("Comparar ex_all em popup"):
-#     st.session_state.show_popup = True
-
-# # Exemplo de dados (substitua pelos reais do seu contexto)
-# dados_barras = [
-#     {"Origem": "GPU", "Conjunto": "Spider", "ex_all": 0.81},
-#     {"Origem": "GPU", "Conjunto": "CNPJ", "ex_all": 0.74},
-#     {"Origem": "OpenAI", "Conjunto": "Spider", "ex_all": 0.85},
-#     {"Origem": "OpenAI", "Conjunto": "CNPJ", "ex_all": 0.79},
-# ]
-
-# df_barras = pd.DataFrame(dados_barras)
 
 if "gpus" not in st.session_state:
     st.session_state.gpus = [
@@ -78,7 +59,7 @@ if "estrategias" not in st.session_state:
     st.session_state.estrategias = []
 
     # ------ ler estratégias do csv ---------------- #
-    df = pd.read_csv('/home/user/Documentos/UFV/Mestrado/VisualizacaoDados/DataVisualization/estrategias.csv')
+    df = pd.read_csv('estrategias.csv')
 
     # Verifica se as colunas obrigatórias estão presentes
     colunas_esperadas = {"name", "memory", "input_tokens", "output_tokens", "time","ex_all_spider-dev","ex_all_cnpj" }
@@ -91,34 +72,34 @@ def tokens_to_price(input_tokens, output_tokens, price_input, price_output):
     return input_tokens / 1_000_000 * price_input * dolar + output_tokens / 1_000_000 * price_output * dolar
 
 # # Main page content
-st.title("📊 Análise de Custo por Requisição")
+st.title("📊 Cost Analysis by Request")
 
-st.sidebar.markdown("# Parâmetros")
+st.sidebar.markdown("# Parameters")
 
 # === GPU ===
 st.sidebar.header("🖥️ GPU")
 gpu_opcoes = [gpu["name"] for gpu in st.session_state.gpus]
-gpu_nome = st.sidebar.selectbox("Escolha a GPU", gpu_opcoes)
+gpu_nome = st.sidebar.selectbox("Choose the GPU", gpu_opcoes)
 
 gpu = next((g for g in st.session_state.gpus if g["name"] == gpu_nome), None)
 
 # === Estratégia ===
-st.sidebar.header("🧠 Estratégia")
+st.sidebar.header("🧠 Strategy")
 estrategia_opcoes = [e["name"] for e in st.session_state.estrategias]
-estrategia_nome = st.sidebar.selectbox("Escolha a Estratégia", estrategia_opcoes)
+estrategia_nome = st.sidebar.selectbox("Choose the Strategy", estrategia_opcoes)
 
 estrategia = next((e for e in st.session_state.estrategias if e["name"] == estrategia_nome), None)
 
 # === APIs ===
 st.sidebar.header("⚙️ APIs")
 api_nomes = [api["name"] for api in st.session_state.apis]
-apis_escolhidas = st.sidebar.multiselect("Escolha as APIs", api_nomes)
+apis_escolhidas = st.sidebar.multiselect("Choose APIs", api_nomes)
 
 
 if estrategia and gpu and apis_escolhidas:
     
     if estrategia["memory"] > gpu["memory"]:
-        st.error("Erro: o modelo ocupa mais memória do que a disponível na GPU.")
+        st.error("Error: Model occupies more memory than available on GPU.")
     else:
     
         col1, col2 = st.columns(2)
@@ -133,9 +114,9 @@ if estrategia and gpu and apis_escolhidas:
             y_gpu = [gpu["hour_price"] / r for r in x]
 
             df_plot = pd.DataFrame({
-                "Requisições por hora": x,
-                "Custo (R$/req)": y_gpu,
-                "Origem": [gpu["name"]] * len(x)
+                "Requests per hour": x,
+                "Cost (R$/req)": y_gpu,
+                "Source": [gpu["name"]] * len(x)
             })
             
             fig = None  # Vamos declarar o fig fora para usar depois
@@ -150,9 +131,9 @@ if estrategia and gpu and apis_escolhidas:
                 
                 y_api = [custo_api] * len(x)
                 df_api = pd.DataFrame({
-                    "Requisições por hora": x,
-                    "Custo (R$/req)": y_api,
-                    "Origem": [api["name"]] * len(x)
+                    "Requests per hour": x,
+                    "Cost (R$/req)": y_api,
+                    "Source": [api["name"]] * len(x)
                 })
                 
                 df_plot = pd.concat([df_plot, df_api], ignore_index=True)
@@ -167,9 +148,9 @@ if estrategia and gpu and apis_escolhidas:
                     y_cross = y_gpu[idx]
                     cross_points.append((x_cross, y_cross, api["name"]))
 
-            fig = px.line(df_plot, x="Requisições por hora", y="Custo (R$/req)", color="Origem",
+            fig = px.line(df_plot, x="Requests per hour", y="Cost (R$/req)", color="Source",
                         log_x=True, log_y=True,
-                        title="Custo por Requisição: GPU remota vs APIs")
+                        title="Cost per Request: Cloud GPU vs APIs")
             
             for i, (x_cross, y_cross, nome_api) in enumerate(cross_points):
                 fig.add_scatter(
@@ -179,7 +160,7 @@ if estrategia and gpu and apis_escolhidas:
                     #hovertext=[f"{x_cross} req/h — {nome_api}"],
                     text=[f"{x_cross} req/h"],
                     textposition="top right",
-                    name="Ponto de cruzamento" if i == 0 else None,
+                    name="break-even point" if i == 0 else None,
                     showlegend=False #(i == 0)
                 )
             
@@ -197,32 +178,32 @@ if estrategia and gpu and apis_escolhidas:
             st.plotly_chart(fig, use_container_width=True)
         
             st.markdown(f"""
-            - **Modelos simultâneos na GPU:** {concurrent_models}  
-            - **Máx. requisições por modelo/hora:** {max_reqs_per_model}  
-            - **Máx. requisições totais por hora:** {max_reqs_total}
+            - **Concurrent models on GPU:** {concurrent_models}
+            - **Max requests per model/hour:** {max_reqs_per_model}
+            - **Max total requests per hour:** {max_reqs_total}
             """)
             
         with col2:
             # Exemplo de dados (substitua pelos reais do seu contexto)
             dados_barras = [
-                {"Origem": estrategia["name"], "Conjunto": "Spider-Dev", "ex_all": estrategia["ex_all_spider-dev"]*100},
-                {"Origem": estrategia["name"], "Conjunto": "CNPJ", "ex_all": estrategia["ex_all_cnpj"]*100}
+                {"Source": estrategia["name"], "Set": "Spider-Dev", "ex_all": estrategia["ex_all_spider-dev"]},
+                {"Source": estrategia["name"], "Set": "CNPJ", "ex_all": estrategia["ex_all_cnpj"]}
             ]
             
             for nome_api in apis_escolhidas:
                 api = next(a for a in st.session_state.apis if a["name"] == nome_api)
-                dados_barras.append({"Origem": api["name"], "Conjunto": "Spider-Dev", "ex_all": api["ex_all_spider-dev"]*100})
-                dados_barras.append({"Origem": api["name"], "Conjunto": "CNPJ", "ex_all": api["ex_all_cnpj"]*100})
+                dados_barras.append({"Source": api["name"], "Set": "Spider-Dev", "ex_all": api["ex_all_spider-dev"]})
+                dados_barras.append({"Source": api["name"], "Set": "CNPJ", "ex_all": api["ex_all_cnpj"]})
 
             df_barras = pd.DataFrame(dados_barras)
 
             fig_barras = px.bar(
                 df_barras,
-                x="Conjunto",
+                x="Set",
                 y="ex_all",
-                color="Origem",
+                color="Source",
                 barmode="group",
-                title="Comparação de Desempenho",
+                title="Performance Comparison",
             )
             # fig_barras.update_layout(showlegend=False)  # Oculta a legend
             
@@ -243,7 +224,7 @@ if estrategia and gpu and apis_escolhidas:
         col1, col2, col3, col4, col5 = st.columns([3, 1.5, 1.5, 1.5, 1.5])
         col1.markdown("<p style='text-align: left'><b>-</b></p>", unsafe_allow_html=True)
         col2.markdown("<p style='text-align: center'><b>Memory</b></p>", unsafe_allow_html=True)
-        col3.markdown("<p style='text-align: center'><b>Preço por Hora</b></p>", unsafe_allow_html=True)
+        col3.markdown("<p style='text-align: center'><b>Hour Price</b></p>", unsafe_allow_html=True)
         col1.markdown(f"{gpu['name']}", unsafe_allow_html=True)
         col2.markdown(f"<p style='text-align: center'> {gpu['memory']} GB</p>", unsafe_allow_html=True)
         col3.markdown(f"<p style='text-align: center'> R$ {gpu['hour_price']}</p>", unsafe_allow_html=True)
@@ -275,57 +256,203 @@ if estrategia and gpu and apis_escolhidas:
             col4.markdown(f"<p style='text-align: center'> $ {api['input_tokens']} = R$ {api['input_tokens']*dolar:.2f}</p>", unsafe_allow_html=True)
             col5.markdown(f"<p style='text-align: center'> $ {api['output_tokens']} = R$ {api['output_tokens']*dolar:.2f}</p>", unsafe_allow_html=True)
         
-        col5.markdown("<p style='text-align: right'>Preço/1M de tokens</p>", unsafe_allow_html=True)
+        col5.markdown("<p style='text-align: right'>Price/1M tokens</p>", unsafe_allow_html=True)
+    
+    
+    with st.expander("📚 Compare Multiple Strategies", expanded=True):
+        select = False
         
-        
+        num_colunas = st.number_input("Number of columns", min_value=1, max_value=6, value=6, step=1)
+        num_linhas = 1
 
+        total_celulas = num_colunas * num_linhas
+
+        estrategias_selecionadas = st.multiselect(
+            "Select strategies",
+            options=estrategia_opcoes,
+            key="estrategias_disponiveis"
+        )
+        
+        if len(estrategias_selecionadas) > total_celulas:
+            st.warning(f"You have selected more strategies ({len(estrategias_selecionadas)}) than available columns ({total_celulas}).")
+        
+        if len(estrategias_selecionadas) == num_colunas*num_linhas:
+            select = True
+        else:
+            st.warning(f"There is a lack of strategies!")
+            select = False
+
+        posicoes_grid = [[None for _ in range(num_colunas)] for _ in range(num_linhas)]
+        
+        count = 0
+        for idx in range(min(len(estrategias_selecionadas), total_celulas)):
+            linha = idx // num_colunas
+            coluna = idx % num_colunas
+            posicoes_grid[linha][coluna] = estrategias_selecionadas[count]
+            count += 1
+
+        if gpu and apis_escolhidas and select:
+            estrategias_dict = {e["name"]: e for e in st.session_state.estrategias}
+            apis_dict = {a["name"]: a for a in st.session_state.apis}
+            x = list(range(1, max_reqs_total + 1))
+
+            celulas_grid = []
+
+            # Etapa 1: montar o grid de containers
+            for i in range(num_linhas):
+                with st.container():
+                    colunas = st.columns(num_colunas)
+                    celulas_grid.append(colunas)
+
+            # Etapa 2: preencher os gráficos no grid
+            for i in range(num_linhas):
+                for j in range(num_colunas):
+                    with celulas_grid[i][j]:
+                        try:
+                            nome_estrategia = posicoes_grid[i][j]
+                            if not nome_estrategia:
+                                st.info("Sem estratégia.")
+                                continue
+
+                            estrategia = estrategias_dict.get(nome_estrategia)
+                            if not estrategia:
+                                st.warning("Estratégia não encontrada.")
+                                continue
+
+                            if estrategia["memory"] > gpu["memory"]:
+                                st.error("Memória excedida.")
+                                continue
+
+                            # Gerar os dados do gráfico
+                            dfs = []
+                            cross_points = []
+
+                            y_gpu = [gpu["hour_price"] / r for r in x]
+                            dfs.append(pd.DataFrame({
+                                "Requests per hour": x,
+                                "Cost (R$/req)": y_gpu,
+                                "Source": [f"{estrategia['name']} (GPU)"] * len(x)
+                            }))
+
+                            for nome_api in apis_escolhidas:
+                                api = apis_dict[nome_api]
+                                custo_api = tokens_to_price(
+                                    estrategia["input_tokens"],
+                                    estrategia["output_tokens"],
+                                    api["input_tokens"],
+                                    api["output_tokens"]
+                                )
+                                y_api = [custo_api] * len(x)
+
+                                dfs.append(pd.DataFrame({
+                                    "Requests per hour": x,
+                                    "Cost (R$/req)": y_api,
+                                    "Source": [f"{estrategia['name']} vs {api['name']}"] * len(x)
+                                }))
+
+                                diff = np.array(y_gpu) - np.array(y_api)
+                                cross_indices = np.where(np.diff(np.sign(diff)))[0]
+                                if len(cross_indices) > 0:
+                                    idx = cross_indices[0]
+                                    cross_points.append((x[idx], y_gpu[idx]))
+
+                            df_plot = pd.concat(dfs, ignore_index=True)
+                            
+                            fig = px.line(
+                                df_plot,
+                                x="Requests per hour",
+                                y="Cost (R$/req)",
+                                color="Source",
+                                log_x=True,
+                                log_y=True,
+                                title=f"{estrategia['name'].replace('Qwen2.5-','')}"
+                            )
+
+                            for x_cross, y_cross in cross_points:
+                                fig.add_scatter(
+                                    x=[x_cross], y=[y_cross],
+                                    mode='markers+text',
+                                    marker=dict(color='green', size=10),
+                                    text=[f"{x_cross} req/h"],
+                                    textposition="top right",
+                                    showlegend=False
+                                )
+
+                            fig.update_yaxes(showticklabels=False, title_text=None)
+
+                            fig.update_layout(
+                                showlegend=False,
+                                margin=dict(l=20, r=20, t=40, b=20),
+                            )
+
+                            st.plotly_chart(fig, use_container_width=True)
+
+                        except Exception as e:
+                            st.error(f"Erro ({i},{j}): {e}")
 
         
+            dados_barras = []
+            for i in range(num_linhas):
+                for j in range(num_colunas):
+                    nome_estrategia = posicoes_grid[i][j]
+                    if not nome_estrategia:
+                        continue
+                    
+                    estrategia = estrategias_dict.get(nome_estrategia)
+                    if not estrategia:
+                        continue
+                    
+                    dados_barras.append({
+                        "Source": estrategia["name"],
+                        "Set": "Spider-Dev",
+                        "ex_all": estrategia.get("ex_all_spider-dev", None)
+                    })
+                    dados_barras.append({
+                        "Source": estrategia["name"],
+                        "Set": "CNPJ",
+                        "ex_all": estrategia.get("ex_all_cnpj", None)
+                    })
+
+            # Para as APIs selecionadas
+            for nome_api in apis_escolhidas:
+                api = next(a for a in st.session_state.apis if a["name"] == nome_api)
+                if not api:
+                    continue
+                dados_barras.append({
+                    "Source": api["name"],
+                    "Set": "Spider-Dev",
+                    "ex_all": api.get("ex_all_spider-dev", None)
+                })
+                dados_barras.append({
+                    "Source": api["name"],
+                    "Set": "CNPJ",
+                    "ex_all": api.get("ex_all_cnpj", None)
+                })
+
+            df_barras = pd.DataFrame(dados_barras)
+
+            fig_barras = px.bar(
+                df_barras,
+                x="Set",
+                y="ex_all",
+                color="Source",
+                barmode="group",
+                title="Performance Comparison"
+            )
+
+            fig_barras.update_layout(
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.5,
+                    xanchor="center",
+                    x=0.5
+                )
+            )
+
+            st.plotly_chart(fig_barras, use_container_width=True)
+               
 else:
-    st.warning("Selecione uma GPU, uma estratégia e ao menos uma API.")
+    st.warning("Select a GPU, a strategy, and at least one API.")
 
 
-# import streamlit as st
-# import pandas as pd
-# import plotly.express as px
-
-# # Dados de exemplo (substitua pelos reais)
-# dados_barras = [
-#     {"Origem": "GPU", "Conjunto": "Spider", "ex_all": 0.81},
-#     {"Origem": "OpenAI", "Conjunto": "Spider", "ex_all": 0.85},
-#     {"Origem": "GPU", "Conjunto": "CNPJ", "ex_all": 0.74},
-#     {"Origem": "OpenAI", "Conjunto": "CNPJ", "ex_all": 0.79},
-# ]
-
-# df_barras = pd.DataFrame(dados_barras)
-
-# # Cria colunas lado a lado
-# col1, col2 = st.columns(2)
-
-# # Gráfico do Spider
-# with col1:
-#     df_spider = df_barras[df_barras["Conjunto"] == "Spider"]
-#     fig_spider = px.bar(
-#         df_spider,
-#         x="Origem",
-#         y="ex_all",
-#         title="ex_all no Spider",
-#         color="Origem",
-#         text="ex_all"
-#     )
-#     fig_spider.update_layout(showlegend=False)
-#     st.plotly_chart(fig_spider, use_container_width=True)
-
-# # Gráfico do CNPJ
-# with col2:
-#     df_cnpj = df_barras[df_barras["Conjunto"] == "CNPJ"]
-#     fig_cnpj = px.bar(
-#         df_cnpj,
-#         x="Origem",
-#         y="ex_all",
-#         title="ex_all no CNPJ",
-#         color="Origem",
-#         text="ex_all"
-#     )
-#     fig_cnpj.update_layout(showlegend=False)
-#     st.plotly_chart(fig_cnpj, use_container_width=True)

@@ -1,16 +1,15 @@
 import streamlit as st
 
-st.markdown("# 🖥️ GPU - Configuração")
+st.markdown("# 🖥️ GPU - Settings")
 
-# st.markdown("### Estratégias Cadastradas")
-with st.expander(f"{len(st.session_state.gpus)} GPUs Cadastradas | Price per 1M tokens", expanded=True):
+with st.expander(f"{len(st.session_state.gpus)} Registered GPUs | Price per 1M tokens", expanded=True):
     if len(st.session_state.gpus) > 0:
 
         col1, col2, col3, col4 = st.columns([4, 2.5, 2.5, 1.5])
         col1.markdown("", unsafe_allow_html=True)
         col2.markdown("<p style='text-align: center'><b>Memory</b></p>", unsafe_allow_html=True)
-        col3.markdown("<p style='text-align: center'><b>Preço por Hora</b></p>", unsafe_allow_html=True)
-        col4.markdown("<p style='text-align: right'><b>Excluir</b></p>", unsafe_allow_html=True)
+        col3.markdown("<p style='text-align: center'><b>Hour Price</b></p>", unsafe_allow_html=True)
+        col4.markdown("<p style='text-align: right'><b>Delete</b></p>", unsafe_allow_html=True)
 
         # Linhas de dados
         for i, est in enumerate(st.session_state.gpus):
@@ -25,18 +24,17 @@ with st.expander(f"{len(st.session_state.gpus)} GPUs Cadastradas | Price per 1M 
                         st.session_state.gpus.pop(i)
                         st.rerun()
     else:
-        st.info("Nenhuma GPU cadastrada ainda.")
+        st.info("No GPU registered yet.")
 
 st.divider()
 
-st.markdown("### Cadastrar API")
+st.markdown("### Register GPU")
 
-# Formulário para cadastro
 with st.form("form_cadastro"):
-    nome = st.text_input("Nome da Instância")
-    memory = st.number_input("Memória (GB)", min_value=0.0, format="%.4f")
-    hour_price = st.number_input("Preço por Hora (R$)", min_value=0.0, format="%.4f")
-    cadastrar = st.form_submit_button("Cadastrar")
+    nome = st.text_input("Name")
+    memory = st.number_input("Memory (GB)", min_value=0.0, format="%.4f")
+    hour_price = st.number_input("Hour Price (R$)", min_value=0.0, format="%.4f")
+    cadastrar = st.form_submit_button("Register")
 
     if cadastrar and nome:
         st.session_state.gpus.append({
@@ -44,5 +42,5 @@ with st.form("form_cadastro"):
             "memory": memory,
             "hour_price": hour_price,
         })
-        st.success(f"GPU '{nome}' cadastrada com sucesso!")
+        st.success(f"GPU '{nome}' successfully registered!")
         st.rerun()
